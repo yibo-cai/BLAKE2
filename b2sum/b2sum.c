@@ -127,6 +127,7 @@ cleanup_buffer:
   return ret;
 }
 
+#if 0
 int blake2sp_stream( FILE *stream, void *resstream, size_t outbytes )
 {
   int ret = -1;
@@ -227,6 +228,7 @@ cleanup_buffer:
   free( buffer );
   return ret;
 }
+#endif
 
 typedef int ( *blake2fn )( FILE *, void *, size_t );
 
@@ -287,6 +289,7 @@ int main( int argc, char **argv )
         maxbytes = BLAKE2S_OUTBYTES;
         algorithm = "BLAKE2s";
       }
+#if 0
       else if ( 0 == strcmp( optarg, "blake2bp" ) )
       {
         blake2_stream = blake2bp_stream;
@@ -299,6 +302,7 @@ int main( int argc, char **argv )
         maxbytes = BLAKE2S_OUTBYTES;
         algorithm = "BLAKE2sp";
       }
+#endif
       else
       {
         printf( "Invalid function name: `%s'\n", optarg );

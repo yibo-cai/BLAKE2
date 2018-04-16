@@ -6,11 +6,11 @@ NO_OPENMP_0=-fopenmp
 NO_OPENMP_1=
 CC?=gcc
 CFLAGS?=-O3 -march=native
-CFLAGS+=-std=c89 -Wall -Wextra -pedantic -Wno-long-long -I../sse
+CFLAGS+=-std=c99 -Wall -Wextra -pedantic -Wno-long-long -I../sse
 CFLAGS+=$(NO_OPENMP_$(NO_OPENMP))
 LIBS=
-#FILES=b2sum.c ../ref/blake2b-ref.c ../ref/blake2s-ref.c ../ref/blake2bp-ref.c ../ref/blake2sp-ref.c
-FILES=b2sum.c ../sse/blake2b.c ../sse/blake2s.c ../sse/blake2bp.c ../sse/blake2sp.c
+#FILES=b2sum.c ../ref/blake2b-ref.c ../ref/blake2s-ref.c
+FILES=b2sum.c ../neon/blake2b.c ../neon/blake2s.c
 all: $(FILES)
 	$(CC) $(FILES) $(CFLAGS) $(LIBS) -o $(PROG)
 
