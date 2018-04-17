@@ -20,6 +20,11 @@
 #include "blake2.h"
 #include "blake2-impl.h"
 
+/*#define NNN*/
+#ifdef NNN
+#include <arm_neon.h>
+#endif
+
 static const uint64_t blake2b_IV[8] =
 {
   0x6a09e667f3bcc908ULL, 0xbb67ae8584caa73bULL,
@@ -150,6 +155,130 @@ int blake2b_init_key( blake2b_state *S, size_t outlen, const void *key, size_t k
   return 0;
 }
 
+#ifdef NNN
+#define ROUND(r)    ROUND##r(m)
+
+/*
+  {  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15 } ,
+  { 14, 10,  4,  8,  9, 15, 13,  6,  1, 12,  0,  2, 11,  7,  5,  3 } ,
+  { 11,  8, 12,  0,  5,  2, 15, 13, 10, 14,  3,  6,  7,  1,  9,  4 } ,
+  {  7,  9,  3,  1, 13, 12, 11, 14,  2,  6,  5, 10,  4,  0, 15,  8 } ,
+  {  9,  0,  5,  7,  2,  4, 10, 15, 14,  1, 11, 12,  6,  8,  3, 13 } ,
+  {  2, 12,  6, 10,  0, 11,  8,  3,  4, 13,  7,  5, 15, 14,  1,  9 } ,
+  { 12,  5,  1, 15, 14, 13,  4, 10,  0,  7,  6,  3,  9,  2,  8, 11 } ,
+  { 13, 11,  7, 14, 12,  1,  3,  9,  5,  0, 15,  4,  8,  6,  2, 10 } ,
+  {  6, 15, 14,  9, 11,  3,  0,  8, 12,  2, 13,  7,  1,  4, 10,  5 } ,
+  { 10,  2,  8,  4,  7,  6,  1,  5, 15, 11,  9, 14,  3, 12, 13 , 0 } ,
+  {  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15 } ,
+  { 14, 10,  4,  8,  9, 15, 13,  6,  1, 12,  0,  2, 11,  7,  5,  3 } ,
+
+  G(r,4,v[ 0],v[ 5],v[10],v[15]);
+  G(r,5,v[ 1],v[ 6],v[11],v[12]);
+  G(r,6,v[ 2],v[ 7],v[ 8],v[13]);
+  G(r,7,v[ 3],v[ 4],v[ 9],v[14]);
+*/
+
+static uint64x2_t V01, V23, V45, V67, V89, Vab, Vcd, Vef;
+
+#define vrorq_u64(v, shift) \
+    vsliq_n_u64(vshrq_n_u64(v, shift), v, 64-shift)
+
+#define mix(q0, q1, a, b, c, d) \
+  do { \
+    a = vaddq_u64(vaddq_u64(a, b), q0); \
+    d = vrorq_u64(veorq_u64(a, d), 32); \
+    c = vaddq_u64(c, d);                \
+    b = vrorq_u64(veorq_u64(b, c), 24); \
+    a = vaddq_u64(vaddq_u64(a, b), q1); \
+    d = vrorq_u64(veorq_u64(a, d), 16); \
+    c = vaddq_u64(c, d);                \
+    b = vrorq_u64(veorq_u64(b, c), 63); \
+  } while (0)
+
+static inline void ROUND0_1(uint64_t *m)
+{
+    uint64_t q[4] = { m[0], m[2], m[1], m[3] };
+    const uint64x2_t Q02 = vld1q_u64(q);
+    const uint64x2_t Q13 = vld1q_u64(q+2);
+
+    mix(Q02, Q13, V01, V45, V89, Vcd);
+}
+
+static inline void ROUND0_2(uint64_t *m)
+{
+    uint64_t q[4] = { m[4], m[6], m[5], m[7] };
+    const uint64x2_t Q46 = vld1q_u64(q);
+    const uint64x2_t Q57 = vld1q_u64(q+2);
+
+    mix(Q46, Q57, V23, V67, Vab, Vef);
+}
+
+static inline void ROUND0(uint64_t *m)
+{
+    ROUND0_1(m);
+    ROUND0_2(m);
+
+    /* !!! */
+    ROUND0_1(m);
+    ROUND0_2(m);
+}
+
+static inline void ROUND1(uint64_t *m)
+{
+    ROUND0(m);
+}
+
+static inline void ROUND2(uint64_t *m)
+{
+    ROUND1(m);
+}
+
+static inline void ROUND3(uint64_t *m)
+{
+    ROUND1(m);
+}
+
+static inline void ROUND4(uint64_t *m)
+{
+    ROUND1(m);
+}
+
+static inline void ROUND5(uint64_t *m)
+{
+    ROUND1(m);
+}
+
+static inline void ROUND6(uint64_t *m)
+{
+    ROUND1(m);
+}
+
+static inline void ROUND7(uint64_t *m)
+{
+    ROUND1(m);
+}
+
+static inline void ROUND8(uint64_t *m)
+{
+    ROUND1(m);
+}
+
+static inline void ROUND9(uint64_t *m)
+{
+    ROUND1(m);
+}
+
+static inline void ROUND10(uint64_t *m)
+{
+    ROUND1(m);
+}
+
+static inline void ROUND11(uint64_t *m)
+{
+    ROUND1(m);
+}
+
+#else
 #define G(r,i,a,b,c,d)                      \
   do {                                      \
     a = a + b + m[blake2b_sigma[r][2*i+0]]; \
@@ -173,6 +302,7 @@ int blake2b_init_key( blake2b_state *S, size_t outlen, const void *key, size_t k
     G(r,6,v[ 2],v[ 7],v[ 8],v[13]); \
     G(r,7,v[ 3],v[ 4],v[ 9],v[14]); \
   } while(0)
+#endif
 
 static void blake2b_compress( blake2b_state *S, const uint8_t block[BLAKE2B_BLOCKBYTES] )
 {
@@ -196,6 +326,17 @@ static void blake2b_compress( blake2b_state *S, const uint8_t block[BLAKE2B_BLOC
   v[13] = blake2b_IV[5] ^ S->t[1];
   v[14] = blake2b_IV[6] ^ S->f[0];
   v[15] = blake2b_IV[7] ^ S->f[1];
+
+#ifdef NNN
+  V01 = vld1q_u64(v);
+  V23 = vld1q_u64(v+2);
+  V45 = vld1q_u64(v+4);
+  V67 = vld1q_u64(v+6);
+  V89 = vld1q_u64(v+8);
+  Vab = vld1q_u64(v+10);
+  Vcd = vld1q_u64(v+12);
+  Vef = vld1q_u64(v+14);
+#endif
 
   ROUND( 0 );
   ROUND( 1 );

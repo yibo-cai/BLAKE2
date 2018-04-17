@@ -23,6 +23,7 @@
 #include "blake2-config.h"
 
 #include <arm_neon.h>
+#include <assert.h>
 
 /*#include "blake2b-round.h"*/
 
@@ -338,6 +339,7 @@ static void blake2b_compress( blake2b_state *S, const uint8_t block[BLAKE2B_BLOC
       row4l = t0; row4h = t1; \
     } while(0)
 
+#if 1
     #define BLAKE2B_ROUND(r) \
     do { \
       uint64x2_t b0, b1; \
@@ -352,12 +354,26 @@ static void blake2b_compress( blake2b_state *S, const uint8_t block[BLAKE2B_BLOC
       BLAKE2B_G2(row1l,row2l,row3l,row4l,row1h,row2h,row3h,row4h,b0,b1); \
       BLAKE2B_UNDIAGONALIZE(row1l,row2l,row3l,row4l,row1h,row2h,row3h,row4h); \
     } while(0)
+#else
+    #define BLAKE2B_ROUND(r) \
+    do { \
+      uint64x2_t b0, b1; \
+      BLAKE2B_LOAD_MSG_ ##r ##_1(b0, b1); \
+      BLAKE2B_G1(row1l,row2l,row3l,row4l,row1h,row2h,row3h,row4h,b0,b1); \
+      BLAKE2B_LOAD_MSG_ ##r ##_2(b0, b1); \
+      BLAKE2B_G2(row1l,row2l,row3l,row4l,row1h,row2h,row3h,row4h,b0,b1); \
+      BLAKE2B_LOAD_MSG_ ##r ##_3(b0, b1); \
+      BLAKE2B_G1(row1l,row2l,row3l,row4l,row1h,row2h,row3h,row4h,b0,b1); \
+      BLAKE2B_LOAD_MSG_ ##r ##_4(b0, b1); \
+      BLAKE2B_G2(row1l,row2l,row3l,row4l,row1h,row2h,row3h,row4h,b0,b1); \
+    } while(0)
+#endif
 
-    /*
-    CRYPTOPP_ASSERT(IsAlignedOn(&S->h[0],GetAlignmentOf<uint64x2_t>()));
-    CRYPTOPP_ASSERT(IsAlignedOn(&S->t[0],GetAlignmentOf<uint64x2_t>()));
-    CRYPTOPP_ASSERT(IsAlignedOn(&S->f[0],GetAlignmentOf<uint64x2_t>()));
-    */
+    #define IsAlignedOn(ptr, align) ((((unsigned long long)(ptr)) & (align)) == 0)
+
+    assert(IsAlignedOn(&S->h[0],15));
+    assert(IsAlignedOn(&S->t[0],15));
+    assert(IsAlignedOn(&S->f[0],15));
 
     const uint64x2_t m0 = vreinterpretq_u64_u8(vld1q_u8(block +  00));
     const uint64x2_t m1 = vreinterpretq_u64_u8(vld1q_u8(block +  16));
